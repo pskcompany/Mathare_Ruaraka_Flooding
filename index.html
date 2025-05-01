@@ -3,7 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Flood-Prone Areas in Mathare and Ruaraka</title>
+    <title>
+      Flood-Prone Areas and Health Facilities in Mathare and Ruaraka
+    </title>
     <!-- Leaflet CSS -->
     <link
       rel="stylesheet"
@@ -40,15 +42,16 @@
         box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
         z-index: 1000;
       }
+      .leaflet-popup-content-wrapper {
+        font-family: Arial, sans-serif;
+      }
     </style>
   </head>
   <body>
     <div id="map"></div>
     <div class="info">
-      <h4>Flood-Prone Areas</h4>
-      <p>
-        Markers indicate areas prone to flooding in Mathare and Ruaraka, Kenya.
-      </p>
+      <h4>Mathare and Ruaraka Flood Zone Map</h4>
+      <p>Red marker: Flood-prone areas<br />Green marker: Health facilities</p>
     </div>
     <script>
       // Initialize the map, centered on Mathare/Ruaraka
@@ -60,17 +63,14 @@
           '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       }).addTo(map);
 
-      // Function to convert CSV row to GeoJSON feature
-      function csvToGeoJSON(csvData) {
+      // Function to convert Flood CSV row to GeoJSON feature
+      function floodCsvToGeoJSON(csvData) {
         var features = csvData
           .map((row) => {
-            // Ensure coordinates are numbers and valid
             var lon = parseFloat(row.LON);
             var lat = parseFloat(row.LAT);
             if (isNaN(lon) || isNaN(lat)) {
-              console.warn(
-                `Invalid coordinates for row: ${JSON.stringify(row)}`
-              );
+              console.warn(`Invalid flood coordinates: ${JSON.stringify(row)}`);
               return null;
             }
             return {
@@ -84,11 +84,11 @@
                 Location: row.LOCATION || "Unknown",
                 Altitude: row.ALT ? parseFloat(row.ALT) : null,
                 Date: row.DATE || null,
-                Photo: row.PHOTO || "",
+                Photo: row.GITHUB_PHOTO || "",
               },
             };
           })
-          .filter((feature) => feature !== null); // Remove invalid features
+          .filter((feature) => feature !== null);
 
         return {
           type: "FeatureCollection",
@@ -96,20 +96,81 @@
         };
       }
 
-      // Load and parse CSV file
+      // Function to convert Health Facilities CSV row to GeoJSON feature
+      function healthCsvToGeoJSON(csvData) {
+        var features = csvData
+          .map((row) => {
+            var lon = parseFloat(row.Longitude);
+            var lat = parseFloat(row.Latitude);
+            if (isNaN(lon) || isNaN(lat)) {
+              console.warn(
+                `Invalid health facility coordinates: ${JSON.stringify(row)}`
+              );
+              return null;
+            }
+            return {
+              type: "Feature",
+              geometry: {
+                type: "Point",
+                coordinates: [lon, lat],
+              },
+              properties: {
+                ObjectID: row.OBJECTID || "Unknown",
+                Name: row.Facility_N || "Unknown",
+                Type: row.Type || "Unknown",
+                Owner: row.Owner || "Unknown",
+                NearestTo: row.Nearest_To || "",
+              },
+            };
+          })
+          .filter((feature) => feature !== null);
+
+        return {
+          type: "FeatureCollection",
+          features: features,
+        };
+      }
+
+      // Custom icons
+      var floodIcon = L.icon({
+        iconUrl:
+          "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png",
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowUrl:
+          "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
+        shadowSize: [41, 41],
+      });
+
+      var healthIcon = L.icon({
+        iconUrl:
+          "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png",
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowUrl:
+          "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
+        shadowSize: [41, 41],
+      });
+
+      // Load and parse Flood CSV
+      var floodLayer;
       Papa.parse("Mathare and Ruaraka Flood prone Areas.csv", {
         download: true,
         header: true,
         skipEmptyLines: true,
         complete: function (results) {
           if (results.errors.length > 0) {
-            console.error("CSV parsing errors:", results.errors);
+            console.error("Flood CSV parsing errors:", results.errors);
             return;
           }
-          var geojsonData = csvToGeoJSON(results.data);
+          var geojsonData = floodCsvToGeoJSON(results.data);
 
-          // Add GeoJSON layer to the map
-          L.geoJSON(geojsonData, {
+          floodLayer = L.geoJSON(geojsonData, {
+            pointToLayer: function (feature, latlng) {
+              return L.marker(latlng, { icon: floodIcon });
+            },
             onEachFeature: function (feature, layer) {
               if (feature.properties) {
                 var popupContent = `
@@ -129,7 +190,7 @@
                                     }
                                     ${
                                       feature.properties.Photo
-                                        ? `<img src="${feature.properties.Photo}" alt="Flood area photo">`
+                                        ? `<img src="${feature.properties.Photo}" alt="Flood area photo" onerror="this.style.display='none';this.nextSibling.style.display='block';"><p style="display:none;">No photo available</p>`
                                         : "<p>No photo available</p>"
                                     }
                                 </div>
@@ -140,9 +201,61 @@
           }).addTo(map);
         },
         error: function (error) {
-          console.error("Error loading CSV:", error);
+          console.error("Error loading Flood CSV:", error);
         },
       });
+
+      // Load and parse Health Facilities CSV
+      var healthLayer;
+      Papa.parse("Mathare-Ruaraka-HF.csv", {
+        download: true,
+        header: true,
+        skipEmptyLines: true,
+        complete: function (results) {
+          if (results.errors.length > 0) {
+            console.error("Health CSV parsing errors:", results.errors);
+            return;
+          }
+          var geojsonData = healthCsvToGeoJSON(results.data);
+
+          healthLayer = L.geoJSON(geojsonData, {
+            pointToLayer: function (feature, latlng) {
+              return L.marker(latlng, { icon: healthIcon });
+            },
+            onEachFeature: function (feature, layer) {
+              if (feature.properties) {
+                var popupContent = `
+                                <div class="popup-content">
+                                    <b>Name:</b> ${feature.properties.Name}<br>
+                                    <b>Type:</b> ${feature.properties.Type}<br>
+                                    <b>Owner:</b> ${
+                                      feature.properties.Owner
+                                    }<br>
+                                    ${
+                                      feature.properties.NearestTo
+                                        ? `<b>Near:</b> ${feature.properties.NearestTo}<br>`
+                                        : ""
+                                    }
+                                </div>
+                            `;
+                layer.bindPopup(popupContent);
+              }
+            },
+          }).addTo(map);
+        },
+        error: function (error) {
+          console.error("Error loading Health CSV:", error);
+        },
+      });
+
+      // Add layer control
+      var overlayLayers = {};
+      if (floodLayer) overlayLayers["Flood-Prone Areas"] = floodLayer;
+      if (healthLayer) overlayLayers["Health Facilities"] = healthLayer;
+
+      L.control
+        .layers(null, overlayLayers, { position: "topright" })
+        .addTo(map);
     </script>
   </body>
 </html>
