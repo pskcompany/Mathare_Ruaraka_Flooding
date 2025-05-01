@@ -47,9 +47,9 @@
       }
       /* Ensure layers control is visible */
       .leaflet-control-layers {
-        z-index: 1100 !important; /* Above .info and other controls */
-        margin-bottom: 10px !important; /* Avoid overlap with zoom controls */
-        margin-left: 10px !important; /* Ensure not clipped on left */
+        z-index: 1100 !important;
+        margin-bottom: 10px !important;
+        margin-left: 10px !important;
       }
       /* Responsive design for mobile */
       @media screen and (max-width: 768px) {
@@ -67,7 +67,7 @@
           margin: 5px 0;
         }
         .leaflet-control-layers {
-          margin-bottom: 50px !important; /* Extra space above zoom controls */
+          margin-bottom: 50px !important;
         }
       }
     </style>
@@ -76,7 +76,10 @@
     <div id="map"></div>
     <div class="info">
       <h4>Mathare and Ruaraka Flood Zone Map</h4>
-      <p>Red marker: Flood-zone areas<br />Green marker: Health facilities</p>
+      <p>
+        Red marker: Flood-zone areas<br />Green marker: Health facilities<br />Blue
+        outline: Mathare & Ruaraka boundary
+      </p>
     </div>
     <script>
       // Initialize the map, centered on Mathare/Ruaraka, with maxZoom
@@ -339,6 +342,40 @@
         },
       });
 
+      // Load and add Mathare and Ruaraka boundary GeoJSON
+      var boundaryLayer;
+      fetch("Mathare_Ruaraka_Boundary.geojson")
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error("Failed to load boundary GeoJSON");
+          }
+          return response.json();
+        })
+        .then((data) => {
+          boundaryLayer = L.geoJSON(data, {
+            style: {
+              color: "#0000FF", // Blue outline
+              weight: 2,
+              opacity: 1,
+              fillColor: "#0000FF",
+              fillOpacity: 0.1, // Slight fill for visibility
+            },
+            onEachFeature: function (feature, layer) {
+              // Optional: Add popup with boundary info
+              if (feature.properties) {
+                var popupContent = `<b>Boundary:</b> Mathare & Ruaraka`;
+                layer.bindPopup(popupContent);
+              }
+            },
+          }).addTo(map);
+          console.log("Boundary layer loaded");
+          updateLayerControl();
+        })
+        .catch((error) => {
+          console.error("Error loading boundary GeoJSON:", error);
+          alert("Failed to load boundary layer. Check console for details.");
+        });
+
       // Function to update layer control with overlays
       function updateLayerControl() {
         if (floodLayer) {
@@ -346,6 +383,9 @@
         }
         if (healthLayer) {
           overlayLayers["Health Facilities"] = healthLayer;
+        }
+        if (boundaryLayer) {
+          overlayLayers["Mathare & Ruaraka Boundary"] = boundaryLayer;
         }
         if (Object.keys(overlayLayers).length > 0) {
           // Remove existing control
