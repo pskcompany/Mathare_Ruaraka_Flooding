@@ -45,6 +45,31 @@
       .leaflet-popup-content-wrapper {
         font-family: Arial, sans-serif;
       }
+      /* Ensure layers control is visible */
+      .leaflet-control-layers {
+        z-index: 1100 !important; /* Above .info and other controls */
+        margin-bottom: 10px !important; /* Avoid overlap with zoom controls */
+        margin-left: 10px !important; /* Ensure not clipped on left */
+      }
+      /* Responsive design for mobile */
+      @media screen and (max-width: 768px) {
+        .info {
+          top: 5px;
+          right: 5px;
+          padding: 5px;
+          font-size: 12px;
+        }
+        .info h4 {
+          margin: 0;
+          font-size: 14px;
+        }
+        .info p {
+          margin: 5px 0;
+        }
+        .leaflet-control-layers {
+          margin-bottom: 50px !important; /* Extra space above zoom controls */
+        }
+      }
     </style>
   </head>
   <body>
@@ -54,7 +79,7 @@
       <p>Red marker: Flood-zone areas<br />Green marker: Health facilities</p>
     </div>
     <script>
-      // Initialize the map, centered on Mathare/Ruaraka, with increased maxZoom
+      // Initialize the map, centered on Mathare/Ruaraka, with maxZoom
       var map = L.map("map", { maxZoom: 19 }).setView([-1.26, 36.86], 14);
 
       // Define basemaps with maxZoom and maxNativeZoom
@@ -63,8 +88,8 @@
         {
           attribution:
             '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-          maxZoom: 26,
-          maxNativeZoom: 26,
+          maxZoom: 19,
+          maxNativeZoom: 19,
         }
       ).addTo(map);
 
@@ -74,7 +99,7 @@
           attribution:
             "Tiles © Esri — Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community",
           maxZoom: 19,
-          maxNativeZoom: 19, // Esri supports up to 22 in some areas, but 19 is consistent
+          maxNativeZoom: 19,
         }
       );
 
@@ -84,7 +109,7 @@
           attribution:
             'Map data: © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: © <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)',
           maxZoom: 19,
-          maxNativeZoom: 17, // OpenTopoMap tiles stop at 17
+          maxNativeZoom: 17,
         }
       );
 
@@ -95,10 +120,17 @@
         OpenTopoMap: openTopoMap,
       };
 
-      // Initialize overlayLayers and layer control (bottom-left as per your change)
+      // Initialize overlayLayers and layer control (bottom-left, collapsed on mobile)
       var overlayLayers = {};
       var layerControl = L.control
-        .layers(baseMaps, {}, { position: "bottomleft" })
+        .layers(
+          baseMaps,
+          {},
+          {
+            position: "bottomleft",
+            collapsed: window.innerWidth <= 768,
+          }
+        )
         .addTo(map);
       console.log("Basemaps-only layer control added");
 
@@ -320,7 +352,10 @@
           layerControl.remove();
           // Add updated control with overlays
           layerControl = L.control
-            .layers(baseMaps, overlayLayers, { position: "bottomleft" })
+            .layers(baseMaps, overlayLayers, {
+              position: "bottomleft",
+              collapsed: window.innerWidth <= 768,
+            })
             .addTo(map);
           console.log(
             "Layer control updated with overlays:",
