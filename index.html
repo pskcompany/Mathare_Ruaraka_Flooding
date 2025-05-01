@@ -51,17 +51,56 @@
     <div id="map"></div>
     <div class="info">
       <h4>Mathare and Ruaraka Flood Zone Map</h4>
-      <p>Red marker: Flood-prone areas<br />Green marker: Health facilities</p>
+      <p>Red marker: Flood-zone areas<br />Green marker: Health facilities</p>
     </div>
     <script>
-      // Initialize the map, centered on Mathare/Ruaraka
-      var map = L.map("map").setView([-1.26, 36.86], 14);
+      // Initialize the map, centered on Mathare/Ruaraka, with increased maxZoom
+      var map = L.map("map", { maxZoom: 19 }).setView([-1.26, 36.86], 14);
 
-      // Add OpenStreetMap tile layer
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution:
-          '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-      }).addTo(map);
+      // Define basemaps with maxZoom and maxNativeZoom
+      var osm = L.tileLayer(
+        "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        {
+          attribution:
+            '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+          maxZoom: 26,
+          maxNativeZoom: 26,
+        }
+      ).addTo(map);
+
+      var esriSatellite = L.tileLayer(
+        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        {
+          attribution:
+            "Tiles © Esri — Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community",
+          maxZoom: 19,
+          maxNativeZoom: 19, // Esri supports up to 22 in some areas, but 19 is consistent
+        }
+      );
+
+      var openTopoMap = L.tileLayer(
+        "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
+        {
+          attribution:
+            'Map data: © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: © <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)',
+          maxZoom: 19,
+          maxNativeZoom: 17, // OpenTopoMap tiles stop at 17
+        }
+      );
+
+      // Basemaps object
+      var baseMaps = {
+        OpenStreetMap: osm,
+        "Esri Satellite": esriSatellite,
+        OpenTopoMap: openTopoMap,
+      };
+
+      // Initialize overlayLayers and layer control (bottom-left as per your change)
+      var overlayLayers = {};
+      var layerControl = L.control
+        .layers(baseMaps, {}, { position: "bottomleft" })
+        .addTo(map);
+      console.log("Basemaps-only layer control added");
 
       // Function to convert Flood CSV row to GeoJSON feature
       function floodCsvToGeoJSON(csvData) {
@@ -163,10 +202,15 @@
         complete: function (results) {
           if (results.errors.length > 0) {
             console.error("Flood CSV parsing errors:", results.errors);
+            alert("Failed to load flood data. Check console for details.");
+            return;
+          }
+          if (!results.data || results.data.length === 0) {
+            console.error("Flood CSV is empty or invalid");
+            alert("Flood CSV is empty or invalid.");
             return;
           }
           var geojsonData = floodCsvToGeoJSON(results.data);
-
           floodLayer = L.geoJSON(geojsonData, {
             pointToLayer: function (feature, latlng) {
               return L.marker(latlng, { icon: floodIcon });
@@ -174,34 +218,39 @@
             onEachFeature: function (feature, layer) {
               if (feature.properties) {
                 var popupContent = `
-                                <div class="popup-content">
-                                    <b>Location:</b> ${
-                                      feature.properties.Location
-                                    }<br>
-                                    ${
-                                      feature.properties.Altitude
-                                        ? `<b>Altitude:</b> ${feature.properties.Altitude} ft<br>`
-                                        : ""
-                                    }
-                                    ${
-                                      feature.properties.Date
-                                        ? `<b>Date:</b> ${feature.properties.Date}<br>`
-                                        : ""
-                                    }
-                                    ${
-                                      feature.properties.Photo
-                                        ? `<img src="${feature.properties.Photo}" alt="Flood area photo" onerror="this.style.display='none';this.nextSibling.style.display='block';"><p style="display:none;">No photo available</p>`
-                                        : "<p>No photo available</p>"
-                                    }
-                                </div>
-                            `;
+                  <div class="popup-content">
+                      <b>Location:</b> ${feature.properties.Location}<br>
+                      ${
+                        feature.properties.Altitude
+                          ? `<b>Altitude:</b> ${feature.properties.Altitude} ft<br>`
+                          : ""
+                      }
+                      ${
+                        feature.properties.Date
+                          ? `<b>Date:</b> ${feature.properties.Date}<br>`
+                          : ""
+                      }
+                      ${
+                        feature.properties.Photo
+                          ? `<img src="${feature.properties.Photo}" alt="Flood area photo" onerror="this.style.display='none';this.nextSibling.style.display='block';"><p style="display:none;">No photo available</p>`
+                          : "<p>No photo available</p>"
+                      }
+                  </div>
+                `;
                 layer.bindPopup(popupContent);
               }
             },
           }).addTo(map);
+          console.log(
+            "Flood layer loaded with",
+            geojsonData.features.length,
+            "features"
+          );
+          updateLayerControl();
         },
         error: function (error) {
           console.error("Error loading Flood CSV:", error);
+          alert("Error loading flood CSV. Check console for details.");
         },
       });
 
@@ -214,10 +263,15 @@
         complete: function (results) {
           if (results.errors.length > 0) {
             console.error("Health CSV parsing errors:", results.errors);
+            alert("Failed to load health data. Check console for details.");
+            return;
+          }
+          if (!results.data || results.data.length === 0) {
+            console.error("Health CSV is empty or invalid");
+            alert("Health CSV is empty or invalid.");
             return;
           }
           var geojsonData = healthCsvToGeoJSON(results.data);
-
           healthLayer = L.geoJSON(geojsonData, {
             pointToLayer: function (feature, latlng) {
               return L.marker(latlng, { icon: healthIcon });
@@ -225,37 +279,55 @@
             onEachFeature: function (feature, layer) {
               if (feature.properties) {
                 var popupContent = `
-                                <div class="popup-content">
-                                    <b>Name:</b> ${feature.properties.Name}<br>
-                                    <b>Type:</b> ${feature.properties.Type}<br>
-                                    <b>Owner:</b> ${
-                                      feature.properties.Owner
-                                    }<br>
-                                    ${
-                                      feature.properties.NearestTo
-                                        ? `<b>Near:</b> ${feature.properties.NearestTo}<br>`
-                                        : ""
-                                    }
-                                </div>
-                            `;
+                  <div class="popup-content">
+                      <b>Name:</b> ${feature.properties.Name}<br>
+                      <b>Type:</b> ${feature.properties.Type}<br>
+                      <b>Owner:</b> ${feature.properties.Owner}<br>
+                      ${
+                        feature.properties.NearestTo
+                          ? `<b>Near:</b> ${feature.properties.NearestTo}<br>`
+                          : ""
+                      }
+                  </div>
+                `;
                 layer.bindPopup(popupContent);
               }
             },
           }).addTo(map);
+          console.log(
+            "Health layer loaded with",
+            geojsonData.features.length,
+            "features"
+          );
+          updateLayerControl();
         },
         error: function (error) {
           console.error("Error loading Health CSV:", error);
+          alert("Error loading health CSV. Check console for details.");
         },
       });
 
-      // Add layer control
-      var overlayLayers = {};
-      if (floodLayer) overlayLayers["Flood-Prone Areas"] = floodLayer;
-      if (healthLayer) overlayLayers["Health Facilities"] = healthLayer;
-
-      L.control
-        .layers(null, overlayLayers, { position: "topright" })
-        .addTo(map);
+      // Function to update layer control with overlays
+      function updateLayerControl() {
+        if (floodLayer) {
+          overlayLayers["Flood-Prone Areas"] = floodLayer;
+        }
+        if (healthLayer) {
+          overlayLayers["Health Facilities"] = healthLayer;
+        }
+        if (Object.keys(overlayLayers).length > 0) {
+          // Remove existing control
+          layerControl.remove();
+          // Add updated control with overlays
+          layerControl = L.control
+            .layers(baseMaps, overlayLayers, { position: "bottomleft" })
+            .addTo(map);
+          console.log(
+            "Layer control updated with overlays:",
+            Object.keys(overlayLayers)
+          );
+        }
+      }
     </script>
   </body>
 </html>
