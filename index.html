@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Flood-Prone Areas in Mathare and Ruaraka</title>
+    <!-- Leaflet CSS -->
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+    <!-- Leaflet JavaScript -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- PapaParse for CSV parsing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <style>
+      body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+      }
+      #map {
+        height: 100vh;
+        width: 100%;
+      }
+      .popup-content {
+        max-width: 200px;
+      }
+      .popup-content img {
+        width: 100%;
+        height: auto;
+        margin-top: 10px;
+      }
+      .info {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: white;
+        padding: 10px;
+        border-radius: 5px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+        z-index: 1000;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+    <div class="info">
+      <h4>Flood-Prone Areas</h4>
+      <p>
+        Markers indicate areas prone to flooding in Mathare and Ruaraka, Kenya.
+      </p>
+    </div>
+    <script>
+      // Initialize the map, centered on Mathare/Ruaraka
+      var map = L.map("map").setView([-1.26, 36.86], 14);
+
+      // Add OpenStreetMap tile layer
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution:
+          '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      }).addTo(map);
+
+      // Function to convert CSV row to GeoJSON feature
+      function csvToGeoJSON(csvData) {
+        var features = csvData
+          .map((row) => {
+            // Ensure coordinates are numbers and valid
+            var lon = parseFloat(row.LON);
+            var lat = parseFloat(row.LAT);
+            if (isNaN(lon) || isNaN(lat)) {
+              console.warn(
+                `Invalid coordinates for row: ${JSON.stringify(row)}`
+              );
+              return null;
+            }
+            return {
+              type: "Feature",
+              geometry: {
+                type: "Point",
+                coordinates: [lon, lat],
+              },
+              properties: {
+                ID: row.ID || "Unknown",
+                Location: row.LOCATION || "Unknown",
+                Altitude: row.ALT ? parseFloat(row.ALT) : null,
+                Date: row.DATE || null,
+                Photo: row.PHOTO || "",
+              },
+            };
+          })
+          .filter((feature) => feature !== null); // Remove invalid features
+
+        return {
+          type: "FeatureCollection",
+          features: features,
+        };
+      }
+
+      // Load and parse CSV file
+      Papa.parse("Mathare and Ruaraka Flood prone Areas.csv", {
+        download: true,
+        header: true,
+        skipEmptyLines: true,
+        complete: function (results) {
+          if (results.errors.length > 0) {
+            console.error("CSV parsing errors:", results.errors);
+            return;
+          }
+          var geojsonData = csvToGeoJSON(results.data);
+
+          // Add GeoJSON layer to the map
+          L.geoJSON(geojsonData, {
+            onEachFeature: function (feature, layer) {
+              if (feature.properties) {
+                var popupContent = `
+                                <div class="popup-content">
+                                    <b>Location:</b> ${
+                                      feature.properties.Location
+                                    }<br>
+                                    ${
+                                      feature.properties.Altitude
+                                        ? `<b>Altitude:</b> ${feature.properties.Altitude} ft<br>`
+                                        : ""
+                                    }
+                                    ${
+                                      feature.properties.Date
+                                        ? `<b>Date:</b> ${feature.properties.Date}<br>`
+                                        : ""
+                                    }
+                                    ${
+                                      feature.properties.Photo
+                                        ? `<img src="${feature.properties.Photo}" alt="Flood area photo">`
+                                        : "<p>No photo available</p>"
+                                    }
+                                </div>
+                            `;
+                layer.bindPopup(popupContent);
+              }
+            },
+          }).addTo(map);
+        },
+        error: function (error) {
+          console.error("Error loading CSV:", error);
+        },
+      });
+    </script>
+  </body>
+</html>
