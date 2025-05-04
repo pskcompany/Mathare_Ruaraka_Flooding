@@ -177,7 +177,7 @@
     </div>
     <script>
       // Initialize the map, centered on Mathare/Ruaraka, with maxZoom
-      var map = L.map("map", { maxZoom: 16 }).setView([-1.26, 36.86], 14);
+      var map = L.map("map", { maxZoom: 22 }).setView([-1.26, 36.86], 14);
 
       // Define basemaps with maxZoom and maxNativeZoom
       var osm = L.tileLayer(
@@ -185,7 +185,7 @@
         {
           attribution:
             '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-          maxZoom: 19,
+          maxZoom: 22,
           maxNativeZoom: 19,
         }
       ).addTo(map);
@@ -195,7 +195,7 @@
         {
           attribution:
             "Tiles © Esri — Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community",
-          maxZoom: 19,
+          maxZoom: 22,
           maxNativeZoom: 19,
         }
       );
